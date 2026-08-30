@@ -1,0 +1,15 @@
+{
+  "name": "Teacher Brain - 外接大脑",
+  "short_name": "外接大脑",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#F5F5F3",
+  "theme_color": "#8B9DAF",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
