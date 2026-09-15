@@ -197,7 +197,10 @@
         <div class="card">
             <div class="collapsible-header" onclick="toggleHistoryCollapse()">
                 <div class="card-title" style="margin:0">历史记录</div>
-                <span class="collapsible-arrow collapsed" id="history-arrow">▼</span>
+                <div style="display:flex;align-items:center;gap:10px">
+                    <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();clearAllHistory()">清除全部</button>
+                    <span class="collapsible-arrow collapsed" id="history-arrow">▼</span>
+                </div>
             </div>
             <div class="collapsible-body collapsed" id="history-body">
                 <div id="event-history"></div>
@@ -238,6 +241,10 @@
             <div class="modal-header">
                 <h2 class="editable-title" id="event-modal-title" onclick="editEventName()">事件处理清单</h2>
                 <button class="close-btn" onclick="closeEventModal()">&times;</button>
+            </div>
+            <div style="margin-bottom:12px;display:flex;align-items:center;gap:8px">
+                <span class="text-sm text-gray" style="white-space:nowrap">截止时间：</span>
+                <input type="datetime-local" id="event-deadline-input" class="form-input" style="flex:1;padding:6px 10px;font-size:13px" onchange="setEventDeadline(this.value)">
             </div>
             <div class="progress-bar"><div class="progress-fill" id="event-progress" style="width:0%"></div></div>
             <div id="event-checklist"></div>
@@ -861,8 +868,26 @@
             const evt = data.activeEvents.find(e => e.id === currentEventId);
             if (!evt) return;
             document.getElementById('event-modal-title').textContent = evt.name;
+            document.getElementById('event-deadline-input').value = evt.deadline || '';
             renderChecklist();
             document.getElementById('event-modal').classList.remove('hidden');
+        }
+
+        function setEventDeadline(value) {
+            const evt = data.activeEvents.find(e => e.id === currentEventId);
+            if (!evt) return;
+            evt.deadline = value || null;
+            saveData();
+            renderActiveEvents();
+        }
+
+        function formatDeadline(isoString) {
+            const d = new Date(isoString);
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mi = String(d.getMinutes()).padStart(2, '0');
+            return mm + '-' + dd + ' ' + hh + ':' + mi;
         }
 
         function closeEventModal() {
@@ -966,11 +991,12 @@
             container.innerHTML = data.activeEvents.map(evt => {
                 const done = evt.checklist.filter(i => i.done).length;
                 const total = evt.checklist.length;
+                const timeText = evt.deadline ? '截止：' + formatDeadline(evt.deadline) : evt.createdAt;
                 return `
                     <div class="list-item" onclick="showEventModal(${evt.id})" style="cursor:pointer">
                         <div class="list-item-info">
                             <h4>${evt.name}</h4>
-                            <p>${evt.createdAt}</p>
+                            <p>${timeText}</p>
                         </div>
                         <span style="color:#888;font-size:14px">${done}/${total}</span>
                     </div>
@@ -979,6 +1005,14 @@
         }
 
         // History collapse
+        function clearAllHistory() {
+            if (!data.eventHistory.length) return;
+            if (!confirm('确定清除所有历史记录？此操作不可恢复。')) return;
+            data.eventHistory = [];
+            saveData();
+            renderHistory();
+        }
+
         function toggleHistoryCollapse() {
             historyCollapsed = !historyCollapsed;
             const arrow = document.getElementById('history-arrow');
