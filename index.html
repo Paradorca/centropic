@@ -78,7 +78,7 @@
         /* Forms */
         .form-group { margin-bottom: 14px; }
         .form-label { display: block; font-size: 13px; font-weight: 500; color: #5A5A5A; margin-bottom: 6px; }
-        .form-input, .form-textarea, .form-select { width: 100%; padding: 10px 12px; border: 1px solid #D8D8D8; border-radius: 8px; font-size: 15px; font-family: inherit; color: #3D3D3D; background: white; }
+        .form-input, .form-textarea, .form-select { width: 100%; padding: 10px 12px; border: 1px solid #D8D8D8; border-radius: 12px; font-size: 15px; font-family: inherit; color: #3D3D3D; background: white; }
         .form-textarea { min-height: 80px; resize: vertical; }
         .form-input:focus, .form-textarea:focus, .form-select:focus { outline: none; border-color: #B8C0C8; }
 
@@ -249,11 +249,40 @@
             <div class="progress-bar"><div class="progress-fill" id="event-progress" style="width:0%"></div></div>
             <div id="event-checklist"></div>
             <div class="mt-4">
-                <button class="btn btn-secondary btn-sm" onclick="addCustomChecklistItem()">+ 添加待办</button>
+                <button class="btn btn-secondary btn-block" style="padding:14px" onclick="addCustomChecklistItem()">+ 添加待办</button>
             </div>
             <div class="mt-4 flex gap-2">
-                <button class="btn btn-secondary btn-sm" onclick="closeEventModal()">稍后处理</button>
-                <button class="btn btn-primary btn-sm" onclick="finishEvent()" id="finish-btn" disabled>完成事件</button>
+                <button class="btn btn-secondary" style="flex:1;padding:14px;justify-content:center" onclick="closeEventModal()">稍后处理</button>
+                <button class="btn btn-primary" style="flex:1;padding:14px;justify-content:center" onclick="finishEvent()" id="finish-btn" disabled>完成事件</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Prompt Modal -->
+    <div id="custom-prompt-modal" class="modal-overlay hidden">
+        <div class="modal-content" style="border-radius:16px">
+            <div class="modal-header">
+                <h2 id="prompt-title">输入</h2>
+                <button class="close-btn" onclick="closeCustomPrompt()">&times;</button>
+            </div>
+            <input type="text" class="form-input" id="prompt-input" style="border-radius:14px">
+            <div class="flex gap-2 mt-4">
+                <button class="btn btn-secondary" style="flex:1" onclick="closeCustomPrompt()">取消</button>
+                <button class="btn btn-primary" style="flex:1" onclick="confirmCustomPrompt()">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Confirm Modal -->
+    <div id="custom-confirm-modal" class="modal-overlay hidden">
+        <div class="modal-content" style="border-radius:16px">
+            <div class="modal-header">
+                <h2 id="confirm-title">确认</h2>
+            </div>
+            <div class="text-sm" id="confirm-message" style="margin-bottom:16px;font-size:15px;color:#5A5A5A"></div>
+            <div class="flex gap-2">
+                <button class="btn btn-secondary" id="confirm-cancel-btn" style="flex:1" onclick="closeCustomConfirm(false)">取消</button>
+                <button class="btn btn-primary" id="confirm-ok-btn" style="flex:1" onclick="closeCustomConfirm(true)">确定</button>
             </div>
         </div>
     </div>
@@ -602,6 +631,11 @@
                 historyCollapsed = data.historyCollapsed !== undefined ? data.historyCollapsed : true;
                 expandedCategory = data.expandedCategory || null;
                 if (!data.templates) data.templates = JSON.parse(JSON.stringify(DEFAULT_TEMPLATES));
+                if (data.students) {
+                    data.students.forEach(s => {
+                        if (!s.achievements) s.achievements = [];
+                    });
+                }
             } else {
                 data.templates = JSON.parse(JSON.stringify(DEFAULT_TEMPLATES));
             }
@@ -611,6 +645,56 @@
             data.historyCollapsed = historyCollapsed;
             data.expandedCategory = expandedCategory;
             localStorage.setItem('teacherBrainData', JSON.stringify(data));
+        }
+
+        // ==================== CUSTOM DIALOGS ====================
+        let promptCallback = null;
+        let confirmCallback = null;
+
+        function showPrompt(title, defaultValue, callback) {
+            document.getElementById('prompt-title').textContent = title;
+            document.getElementById('prompt-input').value = defaultValue || '';
+            promptCallback = callback;
+            document.getElementById('custom-prompt-modal').classList.remove('hidden');
+            setTimeout(() => document.getElementById('prompt-input').focus(), 100);
+        }
+
+        function confirmCustomPrompt() {
+            const value = document.getElementById('prompt-input').value;
+            const cb = promptCallback;
+            promptCallback = null;
+            document.getElementById('custom-prompt-modal').classList.add('hidden');
+            if (cb) cb(value);
+        }
+
+        function closeCustomPrompt() {
+            const cb = promptCallback;
+            promptCallback = null;
+            document.getElementById('custom-prompt-modal').classList.add('hidden');
+            if (cb) cb(null);
+        }
+
+        function showConfirm(title, message, callback) {
+            document.getElementById('confirm-title').textContent = title;
+            document.getElementById('confirm-message').textContent = message;
+            document.getElementById('confirm-cancel-btn').classList.remove('hidden');
+            confirmCallback = callback;
+            document.getElementById('custom-confirm-modal').classList.remove('hidden');
+        }
+
+        function showAlert(title, message) {
+            document.getElementById('confirm-title').textContent = title;
+            document.getElementById('confirm-message').textContent = message;
+            document.getElementById('confirm-cancel-btn').classList.add('hidden');
+            confirmCallback = null;
+            document.getElementById('custom-confirm-modal').classList.remove('hidden');
+        }
+
+        function closeCustomConfirm(result) {
+            const cb = confirmCallback;
+            confirmCallback = null;
+            document.getElementById('custom-confirm-modal').classList.add('hidden');
+            if (cb) cb(result);
         }
 
         // ==================== NAVIGATION ====================
@@ -759,7 +843,7 @@
             const id = document.getElementById('template-edit-id').value;
             const name = document.getElementById('template-edit-name').value.trim();
             const emoji = document.getElementById('template-edit-emoji').value.trim();
-            if (!name) return alert('请输入事件名称');
+            if (!name) return showAlert('提示', '请输入事件名称');
 
             const items = [];
             document.querySelectorAll('#template-edit-list input').forEach(input => {
@@ -782,11 +866,13 @@
         }
 
         function deleteTemplateById(id) {
-            if (!confirm('确定删除这个事件模板？')) return;
-            delete data.templates[id];
-            saveData();
-            renderCategoryEvents();
-            updateCategoryCounts();
+            showConfirm('删除模板', '确定删除这个事件模板？', function(ok) {
+                if (!ok) return;
+                delete data.templates[id];
+                saveData();
+                renderCategoryEvents();
+                updateCategoryCounts();
+            });
         }
 
         // ==================== CUSTOM TEMPLATE ====================
@@ -807,7 +893,7 @@
             const category = document.getElementById('custom-template-category').value;
             const emoji = document.getElementById('custom-template-emoji').value.trim();
             const checklistText = document.getElementById('custom-template-checklist').value;
-            if (!name) return alert('请输入事件名称');
+            if (!name) return showAlert('提示', '请输入事件名称');
 
             const checklist = checklistText.split('\n').filter(x => x.trim());
             if (!checklist.length) checklist.push('处理事项');
@@ -828,20 +914,22 @@
         // ==================== EVENTS ====================
         function triggerTempEvent() {
             if (templateEditMode) return;
-            const name = prompt('临时事件名称：') || '临时事件';
-            const eventObj = {
-                id: Date.now(),
-                templateId: null,
-                name: name,
-                category: '临时',
-                checklist: [],
-                createdAt: new Date().toLocaleString('zh-CN')
-            };
-            data.activeEvents.push(eventObj);
-            currentEventId = eventObj.id;
-            showEventModal();
-            renderActiveEvents();
-            saveData();
+            showPrompt('临时事件名称', '', function(name) {
+                if (name === null) return;
+                const eventObj = {
+                    id: Date.now(),
+                    templateId: null,
+                    name: name.trim() || '临时事件',
+                    category: '临时',
+                    checklist: [],
+                    createdAt: new Date().toLocaleString('zh-CN')
+                };
+                data.activeEvents.push(eventObj);
+                currentEventId = eventObj.id;
+                showEventModal();
+                renderActiveEvents();
+                saveData();
+            });
         }
 
         function triggerEvent(templateId) {
@@ -901,13 +989,13 @@
         function editEventName() {
             const evt = data.activeEvents.find(e => e.id === currentEventId);
             if (!evt) return;
-            const newName = prompt('修改事件名称：', evt.name);
-            if (newName && newName.trim()) {
+            showPrompt('修改事件名称', evt.name, function(newName) {
+                if (newName === null || !newName.trim()) return;
                 evt.name = newName.trim();
                 document.getElementById('event-modal-title').textContent = evt.name;
                 renderActiveEvents();
                 saveData();
-            }
+            });
         }
 
         function renderChecklist() {
@@ -931,6 +1019,7 @@
                         <label for="chk-${idx}">${item.text}</label>
                         ${item.note ? `<div class="checklist-note">批注：${item.note}</div>` : ''}
                     </div>
+                    <span class="note-btn" onclick="editChecklistItem(${idx})">编辑</span>
                     ${showNote ? `<span class="note-btn" onclick="addNote(${idx})">${item.note ? '修改批注' : '批注'}</span>` : ''}
                 </div>
             `).join('');
@@ -948,23 +1037,34 @@
             if (templateEditMode) return;
             const evt = data.activeEvents.find(e => e.id === currentEventId);
             if (!evt) return;
-            const note = prompt('添加批注：', evt.checklist[idx].note || '');
-            if (note !== null) {
+            showPrompt('添加批注', evt.checklist[idx].note || '', function(note) {
+                if (note === null) return;
                 evt.checklist[idx].note = note;
                 renderChecklist();
                 saveData();
-            }
+            });
         }
 
         function addCustomChecklistItem() {
             const evt = data.activeEvents.find(e => e.id === currentEventId);
             if (!evt) return;
-            const text = prompt('新待办事项：');
-            if (text && text.trim()) {
+            showPrompt('新待办事项', '', function(text) {
+                if (text === null || !text.trim()) return;
                 evt.checklist.push({ text: text.trim(), done: false, note: '' });
                 renderChecklist();
                 saveData();
-            }
+            });
+        }
+
+        function editChecklistItem(idx) {
+            const evt = data.activeEvents.find(e => e.id === currentEventId);
+            if (!evt) return;
+            showPrompt('修改待办', evt.checklist[idx].text, function(text) {
+                if (text === null || !text.trim()) return;
+                evt.checklist[idx].text = text.trim();
+                renderChecklist();
+                saveData();
+            });
         }
 
         function finishEvent() {
@@ -1007,10 +1107,12 @@
         // History collapse
         function clearAllHistory() {
             if (!data.eventHistory.length) return;
-            if (!confirm('确定清除所有历史记录？此操作不可恢复。')) return;
-            data.eventHistory = [];
-            saveData();
-            renderHistory();
+            showConfirm('清除历史', '确定清除所有历史记录？此操作不可恢复。', function(ok) {
+                if (!ok) return;
+                data.eventHistory = [];
+                saveData();
+                renderHistory();
+            });
         }
 
         function toggleHistoryCollapse() {
@@ -1156,7 +1258,7 @@
                 location: document.getElementById('course-location').value,
                 note: document.getElementById('course-note').value
             };
-            if (!course.name) return alert('请输入课程名称');
+            if (!course.name) return showAlert('提示', '请输入课程名称');
 
             if (currentCourseId) {
                 const idx = data.courses.findIndex(c => c.id === currentCourseId);
@@ -1172,11 +1274,13 @@
 
         function deleteCurrentCourse() {
             if (!currentCourseId) return;
-            if (!confirm('确定删除？')) return;
-            data.courses = data.courses.filter(c => c.id !== currentCourseId);
-            saveData();
-            closeCourseModal();
-            renderCourses();
+            showConfirm('删除课程', '确定删除？', function(ok) {
+                if (!ok) return;
+                data.courses = data.courses.filter(c => c.id !== currentCourseId);
+                saveData();
+                closeCourseModal();
+                renderCourses();
+            });
         }
 
         // ==================== STUDENTS ====================
@@ -1196,19 +1300,22 @@
                 interview: document.getElementById('student-interview').value,
                 status: document.getElementById('student-status').value,
                 events: [],
+                achievements: [],
                 createdAt: new Date().toLocaleString('zh-CN')
             };
-            if (!student.name) return alert('请输入姓名');
+            if (!student.name) return showAlert('提示', '请输入姓名');
             data.students.push(student);
             saveData();
             closeStudentModal();
             renderStudents();
         }
         function deleteStudent(id) {
-            if (!confirm('确定删除？')) return;
-            data.students = data.students.filter(s => s.id !== id);
-            saveData();
-            renderStudents();
+            showConfirm('删除学生', '确定删除？', function(ok) {
+                if (!ok) return;
+                data.students = data.students.filter(s => s.id !== id);
+                saveData();
+                renderStudents();
+            });
         }
         function renderStudents() {
             const container = document.getElementById('student-list');
@@ -1272,6 +1379,19 @@
                         </div>
                     `).join('') : '<div class="text-sm text-gray">暂无事件</div>'}
                 </div>
+                <div class="section-title">成就展示</div>
+                <div id="student-achievements">
+                    ${s.achievements && s.achievements.length ? s.achievements.map((a, idx) => `
+                        <div class="event-log" style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+                            <div style="flex:1">
+                                <div class="event-log-date">${a.date}</div>
+                                <div class="event-log-text">${a.text}</div>
+                            </div>
+                            <span style="color:#DC2626;cursor:pointer;font-size:13px;white-space:nowrap" onclick="deleteAchievement(${idx})">删除</span>
+                        </div>
+                    `).join('') : '<div class="text-sm text-gray">暂无成就</div>'}
+                </div>
+                <button class="btn btn-secondary btn-block" style="padding:12px;margin-top:8px" onclick="addAchievement()">+ 添加成就</button>
                 <div class="mt-4">
                     <button class="btn btn-danger btn-block" onclick="deleteStudent(${s.id}); closeStudentDetailModal();">删除学生档案</button>
                 </div>
@@ -1302,13 +1422,13 @@
         function editStudentStatus() {
             const s = data.students.find(x => x.id === currentStudentId);
             if (!s) return;
-            const newStatus = prompt('更新状态：', s.status);
-            if (newStatus !== null) {
+            showPrompt('更新状态', s.status, function(newStatus) {
+                if (newStatus === null) return;
                 s.status = newStatus;
                 saveData();
                 showStudentDetail(currentStudentId);
                 renderStudents();
-            }
+            });
         }
         function showAddEventForm() {
             editingEventIdx = null;
@@ -1346,6 +1466,28 @@
             input.value = s.events[idx].text;
             input.focus();
         }
+        function addAchievement() {
+            const s = data.students.find(x => x.id === currentStudentId);
+            if (!s) return;
+            showPrompt('新成就', '', function(text) {
+                if (text === null || !text.trim()) return;
+                s.achievements.push({ id: Date.now(), date: new Date().toLocaleString('zh-CN'), text: text.trim() });
+                saveData();
+                showStudentDetail(currentStudentId);
+                renderStudents();
+            });
+        }
+        function deleteAchievement(idx) {
+            const s = data.students.find(x => x.id === currentStudentId);
+            if (!s) return;
+            showConfirm('删除成就', '确定删除这条成就？', function(ok) {
+                if (!ok) return;
+                s.achievements.splice(idx, 1);
+                saveData();
+                showStudentDetail(currentStudentId);
+                renderStudents();
+            });
+        }
 
         // ==================== SCHEDULE ====================
         function showScheduleModal() {
@@ -1366,7 +1508,7 @@
                 note: document.getElementById('schedule-note').value,
                 done: false
             };
-            if (!item.title) return alert('请输入事项');
+            if (!item.title) return showAlert('提示', '请输入事项');
             data.schedules.push(item);
             data.schedules.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
             saveData();
@@ -1378,10 +1520,12 @@
             if (item) { item.done = !item.done; saveData(); renderSchedule(); }
         }
         function deleteSchedule(id) {
-            if (!confirm('确定删除？')) return;
-            data.schedules = data.schedules.filter(s => s.id !== id);
-            saveData();
-            renderSchedule();
+            showConfirm('删除日程', '确定删除？', function(ok) {
+                if (!ok) return;
+                data.schedules = data.schedules.filter(s => s.id !== id);
+                saveData();
+                renderSchedule();
+            });
         }
         function renderSchedule() {
             const container = document.getElementById('schedule-list');
