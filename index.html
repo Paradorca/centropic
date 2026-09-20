@@ -189,6 +189,12 @@
         .color-swatch { width: 30px; height: 30px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; position: relative; }
         .color-swatch.selected { border-color: #4A4A4A; box-shadow: 0 0 0 2px #fff inset; }
         .color-swatch.selected::after { content: '✓'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: white; font-size: 14px; text-shadow: 0 0 2px rgba(0,0,0,0.4); }
+
+        /* Schedule edit (inline expand) */
+        .schedule-edit { background: #FAFAFA; border-radius: 10px; padding: 12px; margin: 4px 0 10px; }
+        .schedule-chevron { color: #BBB; font-size: 16px; transition: transform 0.2s; flex-shrink: 0; }
+        .schedule-chevron.open { transform: rotate(180deg); }
+        .schedule-expand-hint { font-size: 11px; color: #B8B8B8; margin-top: 2px; }
     </style>
 </head>
 <body>
@@ -678,6 +684,9 @@
         let pickerYear = null, pickerMonth = null;
         let pickerFirst = null, pickerSecond = null;
         let scheduleColorName = '灰';
+        let editingScheduleId = null;
+        let editPickerYear = null, editPickerMonth = null;
+        let editPickerFirst = null, editPickerSecond = null;
         let editingEventIdx = null;
 
         // ==================== STORAGE ====================
@@ -1796,6 +1805,7 @@
             showConfirm('删除日程', '确定删除？', function(ok) {
                 if (!ok) return;
                 data.schedules = data.schedules.filter(s => s.id !== id);
+                if (editingScheduleId === id) editingScheduleId = null;
                 saveData();
                 renderSchedule();
                 renderScheduleCalendar();
@@ -1823,22 +1833,148 @@
                     const start = s.startDate || s.date;
                     const end = s.endDate || start;
                     const range = start !== end ? ` <span class="text-sm text-gray">(${start} ~ ${end})</span>` : '';
+                    const isOpen = editingScheduleId === s.id;
+                    const editHtml = isOpen ? `
+                    <div class="schedule-edit">
+                        <div class="form-group">
+                            <label class="form-label">事项名称</label>
+                            <input type="text" class="form-input" id="sched-edit-title" value="${s.title.replace(/"/g, '&quot;')}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">时间</label>
+                            <input type="time" class="form-input" id="sched-edit-time" value="${s.time || ''}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">持续时间（点击两个日期调整）</label>
+                            <div class="picker">
+                                <div class="calendar-header">
+                                    <button class="cal-nav" onclick="changeEditPickerMonth(-1)">‹</button>
+                                    <span class="cal-title" id="edit-picker-title"></span>
+                                    <button class="cal-nav" onclick="changeEditPickerMonth(1)">›</button>
+                                </div>
+                                <div class="calendar-weekdays"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+                                <div class="calendar-grid" id="edit-picker-grid"></div>
+                                <div class="picker-range" id="edit-picker-range-label"></div>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:8px">
+                            <button class="btn btn-primary" style="flex:1;justify-content:center" onclick="saveScheduleEdit(${s.id})">保存修改</button>
+                            <button class="btn btn-secondary" style="justify-content:center" onclick="toggleScheduleExpand(${s.id})">收起</button>
+                        </div>
+                    </div>` : '';
                     return `
                     <div class="list-item">
-                        <div class="list-item-info" style="display:flex;align-items:center;gap:10px">
-                            <input type="checkbox" ${s.done ? 'checked' : ''} onchange="toggleSchedule(${s.id})">
-                            <div style="${s.done ? 'text-decoration:line-through;color:#AAA' : ''}">
+                        <div class="list-item-info" style="display:flex;align-items:center;gap:10px;flex:1;cursor:pointer" onclick="toggleScheduleExpand(${s.id})">
+                            <input type="checkbox" ${s.done ? 'checked' : ''} onchange="toggleSchedule(${s.id})" onclick="event.stopPropagation()">
+                            <div style="flex:1;${s.done ? 'text-decoration:line-through;color:#AAA' : ''}">
                                 <h4><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:6px"></span>${s.time || '全天'} · ${s.title}${range}</h4>
                                 ${s.note ? `<p>${s.note}</p>` : ''}
+                                ${isOpen ? '' : '<div class="schedule-expand-hint">点击展开编辑</div>'}
                             </div>
+                            <span class="schedule-chevron ${isOpen ? 'open' : ''}">▾</span>
                         </div>
                         <button class="btn btn-danger btn-sm" onclick="deleteSchedule(${s.id})">删除</button>
                     </div>
+                    ${editHtml}
                 `;
                 }).join('');
                 html += '</div>';
             });
             container.innerHTML = html;
+            if (editingScheduleId) renderEditPicker();
+        }
+        function toggleScheduleExpand(id) {
+            if (editingScheduleId === id) {
+                editingScheduleId = null;
+            } else {
+                editingScheduleId = id;
+                const s = data.schedules.find(x => x.id === id);
+                if (s) {
+                    const p = (s.startDate || s.date).split('-');
+                    editPickerYear = +p[0];
+                    editPickerMonth = +p[1] - 1;
+                    editPickerFirst = s.startDate || s.date;
+                    editPickerSecond = (s.endDate && s.endDate !== (s.startDate || s.date)) ? s.endDate : null;
+                }
+            }
+            renderSchedule();
+        }
+        function changeEditPickerMonth(delta) {
+            editPickerMonth += delta;
+            if (editPickerMonth < 0) { editPickerMonth = 11; editPickerYear--; }
+            if (editPickerMonth > 11) { editPickerMonth = 0; editPickerYear++; }
+            renderEditPicker();
+        }
+        function tapEditPickerDay(dateStr) {
+            if (editPickerFirst === null) {
+                editPickerFirst = dateStr;
+                editPickerSecond = null;
+            } else if (editPickerSecond === null) {
+                if (dateStr === editPickerFirst) {
+                    editPickerFirst = null;
+                } else {
+                    editPickerSecond = dateStr;
+                }
+            } else {
+                editPickerFirst = dateStr;
+                editPickerSecond = null;
+            }
+            renderEditPicker();
+        }
+        function renderEditPicker() {
+            const titleEl = document.getElementById('edit-picker-title');
+            if (!titleEl) return;
+            titleEl.textContent = editPickerYear + '年' + (editPickerMonth + 1) + '月';
+            const cells = getMonthCells(editPickerYear, editPickerMonth);
+            let start = null, end = null;
+            if (editPickerFirst && editPickerSecond) {
+                start = editPickerFirst < editPickerSecond ? editPickerFirst : editPickerSecond;
+                end = editPickerFirst < editPickerSecond ? editPickerSecond : editPickerFirst;
+            }
+            const grid = document.getElementById('edit-picker-grid');
+            let html = '';
+            cells.forEach(c => {
+                const cls = ['cal-cell'];
+                if (c.dim) cls.push('dim');
+                if (!c.dim && start && end) {
+                    if (c.date === start) cls.push('range-start');
+                    else if (c.date === end) cls.push('range-end');
+                    else if (c.date > start && c.date < end) cls.push('in-range');
+                } else if (!c.dim && editPickerFirst && !editPickerSecond && c.date === editPickerFirst) {
+                    cls.push('range-start');
+                }
+                const click = c.dim ? '' : `onclick="tapEditPickerDay('${c.date}')"`;
+                html += `<div class="${cls.join(' ')}" ${click}><div class="cal-day-num">${+c.date.slice(8)}</div></div>`;
+            });
+            grid.innerHTML = html;
+            const label = document.getElementById('edit-picker-range-label');
+            if (editPickerFirst && editPickerSecond) {
+                label.textContent = `${start} 至 ${end}`;
+            } else if (editPickerFirst) {
+                label.textContent = `${editPickerFirst}（单日）`;
+            } else {
+                label.textContent = '未选择日期';
+            }
+        }
+        function saveScheduleEdit(id) {
+            const s = data.schedules.find(x => x.id === id);
+            if (!s) return;
+            const title = document.getElementById('sched-edit-title').value.trim();
+            if (!title) return showAlert('提示', '请输入事项');
+            s.title = title;
+            s.time = document.getElementById('sched-edit-time').value;
+            if (editPickerFirst && editPickerSecond) {
+                s.startDate = editPickerFirst < editPickerSecond ? editPickerFirst : editPickerSecond;
+                s.endDate = editPickerFirst < editPickerSecond ? editPickerSecond : editPickerFirst;
+            } else if (editPickerFirst) {
+                s.startDate = editPickerFirst;
+                s.endDate = editPickerFirst;
+            }
+            saveData();
+            editingScheduleId = null;
+            renderSchedule();
+            renderScheduleCalendar();
+            renderScheduleDayDetail();
         }
 
         // ==================== INIT ====================
