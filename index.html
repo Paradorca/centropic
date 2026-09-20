@@ -151,6 +151,44 @@
         .template-edit-item { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid #F0F0F0; }
         .template-edit-item input { flex: 1; border: 1px solid #E0E0E0; border-radius: 6px; padding: 6px 10px; font-size: 14px; }
         .template-edit-item .del-item { color: #DC2626; cursor: pointer; font-size: 18px; }
+
+        /* Calendar */
+        .calendar { background: white; border-radius: 12px; padding: 14px 10px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+        .calendar-header { display: flex; align-items: center; justify-content: space-between; padding: 0 4px 10px; }
+        .calendar-header .cal-title { font-size: 15px; font-weight: 600; color: #4A4A4A; }
+        .calendar-header .cal-nav { background: #F0F0F0; border: none; border-radius: 8px; width: 30px; height: 30px; font-size: 18px; color: #5A5A5A; cursor: pointer; line-height: 1; }
+        .calendar-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 4px; }
+        .calendar-weekdays span { text-align: center; font-size: 11px; color: #999; padding: 2px 0; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+        .cal-cell { position: relative; min-height: 46px; border-radius: 6px; padding: 4px 2px; cursor: pointer; text-align: center; }
+        .cal-cell.dim { opacity: 0.28; }
+        .cal-cell.today .cal-day-num { background: #E8ECEF; border-radius: 50%; color: #4A4A4A; }
+        .cal-cell.selected-day { background: #EFF2F5; }
+        .cal-day-num { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; font-size: 13px; color: #4A4A4A; margin-bottom: 2px; }
+        .cal-dots { display: flex; flex-direction: column; gap: 2px; align-items: center; min-height: 8px; }
+        .ev-row { position: relative; width: 100%; height: 8px; }
+        .ev-line { position: absolute; top: 50%; transform: translateY(-50%); height: 2px; }
+        .ev-dot { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 8px; height: 8px; border-radius: 50%; }
+        .cal-cell.has-events { font-weight: 500; }
+
+        /* Calendar selected day detail */
+        .cal-day-detail { background: #FAFAFA; border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+        .cal-day-detail .detail-date { font-size: 13px; font-weight: 600; color: #4A4A4A; margin-bottom: 8px; }
+        .cal-day-event { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; color: #3D3D3D; }
+        .cal-day-event .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+        /* Picker (modal) */
+        .picker { border: 1px solid #E0E0E0; border-radius: 12px; padding: 10px; }
+        .picker .cal-cell { min-height: 38px; padding: 3px 2px; }
+        .picker .cal-cell.range-start .cal-day-num, .picker .cal-cell.range-end .cal-day-num { background: #B8C0C8; color: white; border-radius: 50%; }
+        .picker .cal-cell.in-range { background: #EFF2F5; }
+        .picker-range { margin-top: 8px; font-size: 13px; color: #5A5A5A; text-align: center; min-height: 18px; }
+
+        /* Color picker */
+        .color-picker { display: flex; flex-wrap: wrap; gap: 10px; }
+        .color-swatch { width: 30px; height: 30px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; position: relative; }
+        .color-swatch.selected { border-color: #4A4A4A; box-shadow: 0 0 0 2px #fff inset; }
+        .color-swatch.selected::after { content: '✓'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: white; font-size: 14px; text-shadow: 0 0 2px rgba(0,0,0,0.4); }
     </style>
 </head>
 <body>
@@ -232,6 +270,8 @@
 
     <div id="view-schedule" class="container hidden fade-in">
         <button class="btn btn-primary btn-block mb-2" onclick="showScheduleModal()">+ 添加日程</button>
+        <div id="schedule-day-detail"></div>
+        <div id="schedule-calendar"></div>
         <div id="schedule-list"></div>
     </div>
 
@@ -434,12 +474,27 @@
                 <button class="close-btn" onclick="closeScheduleModal()">&times;</button>
             </div>
             <div class="form-group">
-                <label class="form-label">日期</label>
-                <input type="date" class="form-input" id="schedule-date">
+                <label class="form-label">日期（点击两个日期生成时间段）</label>
+                <div class="picker">
+                    <div class="calendar-header">
+                        <button class="cal-nav" onclick="changePickerMonth(-1)">‹</button>
+                        <span class="cal-title" id="picker-title"></span>
+                        <button class="cal-nav" onclick="changePickerMonth(1)">›</button>
+                    </div>
+                    <div class="calendar-weekdays">
+                        <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+                    </div>
+                    <div class="calendar-grid" id="picker-grid"></div>
+                    <div class="picker-range" id="picker-range-label">未选择日期</div>
+                </div>
             </div>
             <div class="form-group">
                 <label class="form-label">时间</label>
                 <input type="time" class="form-input" id="schedule-time">
+            </div>
+            <div class="form-group">
+                <label class="form-label">颜色</label>
+                <div class="color-picker" id="schedule-color-picker"></div>
             </div>
             <div class="form-group">
                 <label class="form-label">事项</label>
@@ -583,6 +638,22 @@
 
         const DAYS = ['周一','周二','周三','周四','周五','周六','周日'];
 
+        const EVENT_COLORS = [
+            { name: '红', value: '#D98880' },
+            { name: '橙', value: '#E8A87C' },
+            { name: '黄', value: '#E5C07B' },
+            { name: '绿', value: '#98C379' },
+            { name: '青', value: '#7FB8B0' },
+            { name: '蓝', value: '#7FA8CC' },
+            { name: '紫', value: '#B08BB8' },
+            { name: '黑', value: '#616161' },
+            { name: '灰', value: '#9E9E9E' }
+        ];
+        function colorByName(name) {
+            const c = EVENT_COLORS.find(x => x.name === name);
+            return c ? c.value : '#9E9E9E';
+        }
+
         // ==================== STATE ====================
         let data = {
             templates: null,
@@ -602,6 +673,11 @@
         let expandedCategory = null;
         let templateEditMode = false;
         let editingTemplateId = null;
+        let calendarYear = null, calendarMonth = null;
+        let selectedScheduleDate = null;
+        let pickerYear = null, pickerMonth = null;
+        let pickerFirst = null, pickerSecond = null;
+        let scheduleColorName = '灰';
         let editingEventIdx = null;
 
         // ==================== STORAGE ====================
@@ -634,6 +710,14 @@
                 if (data.students) {
                     data.students.forEach(s => {
                         if (!s.achievements) s.achievements = [];
+                    });
+                }
+                if (data.schedules) {
+                    data.schedules.forEach(s => {
+                        if (!s.startDate && s.date) { s.startDate = s.date; s.endDate = s.date; }
+                        if (!s.startDate) s.startDate = s.endDate || s.date || '';
+                        if (!s.endDate) s.endDate = s.startDate;
+                        if (!s.color) s.color = '灰';
                     });
                 }
             } else {
@@ -707,7 +791,7 @@
             document.getElementById('header-subtitle').textContent = tabs[tab];
             if (tab === 'courses') renderCourses();
             if (tab === 'students') renderStudents();
-            if (tab === 'schedule') renderSchedule();
+            if (tab === 'schedule') { renderSchedule(); renderScheduleCalendar(); renderScheduleDayDetail(); }
         }
 
         // ==================== EDIT MODE ====================
@@ -1490,34 +1574,223 @@
         }
 
         // ==================== SCHEDULE ====================
+        function pad(n) { return n < 10 ? '0' + n : '' + n; }
+        function toDateStr(dt) { return dt.getFullYear() + '-' + pad(dt.getMonth() + 1) + '-' + pad(dt.getDate()); }
+        function todayStr() { return toDateStr(new Date()); }
+        function getMonthCells(year, month) {
+            const first = new Date(year, month, 1);
+            const startOffset = (first.getDay() + 6) % 7;
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const cells = [];
+            for (let i = startOffset; i > 0; i--) cells.push({ date: toDateStr(new Date(year, month, 1 - i)), dim: true });
+            for (let d = 1; d <= daysInMonth; d++) cells.push({ date: toDateStr(new Date(year, month, d)), dim: false });
+            let next = daysInMonth + 1;
+            while (cells.length % 7 !== 0) cells.push({ date: toDateStr(new Date(year, month, next++)), dim: true });
+            return cells;
+        }
+        function getEventsForDate(dateStr) {
+            return data.schedules.filter(s => {
+                const start = s.startDate || s.date;
+                const end = s.endDate || start;
+                return dateStr >= start && dateStr <= end;
+            });
+        }
+        function renderEventRow(e, date) {
+            const start = e.startDate || e.date;
+            const end = e.endDate || start;
+            const color = colorByName(e.color);
+            if (start === end) {
+                return `<div class="ev-row"><span class="ev-dot" style="background:${color};left:50%"></span></div>`;
+            }
+            if (date === start) {
+                return `<div class="ev-row"><span class="ev-line" style="background:${color};left:50%;right:0"></span><span class="ev-dot" style="background:${color};left:50%"></span></div>`;
+            }
+            if (date === end) {
+                return `<div class="ev-row"><span class="ev-line" style="background:${color};left:0;right:50%"></span><span class="ev-dot" style="background:${color};left:50%"></span></div>`;
+            }
+            return `<div class="ev-row"><span class="ev-line" style="background:${color};left:0;right:0"></span></div>`;
+        }
+        function changeCalendarMonth(delta) {
+            calendarMonth += delta;
+            if (calendarMonth < 0) { calendarMonth = 11; calendarYear--; }
+            if (calendarMonth > 11) { calendarMonth = 0; calendarYear++; }
+            renderScheduleCalendar();
+        }
+        function selectScheduleDay(dateStr) {
+            selectedScheduleDate = (selectedScheduleDate === dateStr) ? null : dateStr;
+            renderScheduleDayDetail();
+            renderScheduleCalendar();
+        }
+        function renderScheduleDayDetail() {
+            const el = document.getElementById('schedule-day-detail');
+            if (!selectedScheduleDate) { el.innerHTML = ''; return; }
+            const evts = getEventsForDate(selectedScheduleDate);
+            if (!evts.length) {
+                el.innerHTML = `<div class="cal-day-detail"><div class="detail-date">${selectedScheduleDate}</div><div style="text-align:center;padding:8px;color:#BBB">当天没有安排</div></div>`;
+                return;
+            }
+            let html = `<div class="cal-day-detail"><div class="detail-date">${selectedScheduleDate}</div>`;
+            evts.forEach(s => {
+                const color = colorByName(s.color);
+                const start = s.startDate || s.date;
+                const end = s.endDate || start;
+                const range = start !== end ? ` <span class="text-gray text-sm">(${start} ~ ${end})</span>` : '';
+                html += `<div class="cal-day-event"><span class="dot" style="background:${color}"></span><span>${s.time || '全天'} · ${s.title}${range}</span></div>`;
+            });
+            html += `</div>`;
+            el.innerHTML = html;
+        }
+        function renderScheduleCalendar() {
+            const el = document.getElementById('schedule-calendar');
+            if (calendarYear === null) {
+                const t = new Date();
+                calendarYear = t.getFullYear();
+                calendarMonth = t.getMonth();
+            }
+            const cells = getMonthCells(calendarYear, calendarMonth);
+            const today = todayStr();
+            let html = `<div class="calendar">
+                <div class="calendar-header">
+                    <button class="cal-nav" onclick="changeCalendarMonth(-1)">‹</button>
+                    <span class="cal-title">${calendarYear}年${calendarMonth + 1}月</span>
+                    <button class="cal-nav" onclick="changeCalendarMonth(1)">›</button>
+                </div>
+                <div class="calendar-weekdays"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+                <div class="calendar-grid">`;
+            cells.forEach(c => {
+                const evts = getEventsForDate(c.date);
+                const cls = ['cal-cell'];
+                if (c.dim) cls.push('dim');
+                if (!c.dim && c.date === today) cls.push('today');
+                if (!c.dim && c.date === selectedScheduleDate) cls.push('selected-day');
+                if (!c.dim && evts.length) cls.push('has-events');
+                const click = c.dim ? '' : `onclick="selectScheduleDay('${c.date}')"`;
+                html += `<div class="${cls.join(' ')}" ${click}>
+                    <div class="cal-day-num">${+c.date.slice(8)}</div>
+                    <div class="cal-dots">${evts.map(e => renderEventRow(e, c.date)).join('')}</div>
+                </div>`;
+            });
+            html += `</div></div>`;
+            el.innerHTML = html;
+        }
+
         function showScheduleModal() {
             document.getElementById('schedule-modal').classList.remove('hidden');
-            document.getElementById('schedule-date').value = new Date().toISOString().split('T')[0];
+            document.getElementById('schedule-title').value = '';
+            document.getElementById('schedule-note').value = '';
+            document.getElementById('schedule-time').value = '';
+            pickerFirst = null;
+            pickerSecond = null;
+            scheduleColorName = '灰';
+            const t = new Date();
+            pickerYear = t.getFullYear();
+            pickerMonth = t.getMonth();
+            renderColorPicker();
+            renderSchedulePicker();
         }
         function closeScheduleModal() {
             document.getElementById('schedule-modal').classList.add('hidden');
             document.getElementById('schedule-title').value = '';
             document.getElementById('schedule-note').value = '';
         }
+        function changePickerMonth(delta) {
+            pickerMonth += delta;
+            if (pickerMonth < 0) { pickerMonth = 11; pickerYear--; }
+            if (pickerMonth > 11) { pickerMonth = 0; pickerYear++; }
+            renderSchedulePicker();
+        }
+        function tapPickerDay(dateStr) {
+            if (pickerFirst === null) {
+                pickerFirst = dateStr;
+                pickerSecond = null;
+            } else if (pickerSecond === null) {
+                if (dateStr === pickerFirst) {
+                    pickerFirst = null;
+                } else {
+                    pickerSecond = dateStr;
+                }
+            } else {
+                pickerFirst = dateStr;
+                pickerSecond = null;
+            }
+            renderSchedulePicker();
+        }
+        function renderSchedulePicker() {
+            document.getElementById('picker-title').textContent = pickerYear + '年' + (pickerMonth + 1) + '月';
+            const cells = getMonthCells(pickerYear, pickerMonth);
+            let start = null, end = null;
+            if (pickerFirst && pickerSecond) {
+                start = pickerFirst < pickerSecond ? pickerFirst : pickerSecond;
+                end = pickerFirst < pickerSecond ? pickerSecond : pickerFirst;
+            }
+            const grid = document.getElementById('picker-grid');
+            let html = '';
+            cells.forEach(c => {
+                const cls = ['cal-cell'];
+                if (c.dim) cls.push('dim');
+                if (!c.dim && start && end) {
+                    if (c.date === start) cls.push('range-start');
+                    else if (c.date === end) cls.push('range-end');
+                    else if (c.date > start && c.date < end) cls.push('in-range');
+                } else if (!c.dim && pickerFirst && !pickerSecond && c.date === pickerFirst) {
+                    cls.push('range-start');
+                }
+                const click = c.dim ? '' : `onclick="tapPickerDay('${c.date}')"`;
+                html += `<div class="${cls.join(' ')}" ${click}><div class="cal-day-num">${+c.date.slice(8)}</div></div>`;
+            });
+            grid.innerHTML = html;
+            const label = document.getElementById('picker-range-label');
+            if (pickerFirst && pickerSecond) {
+                label.textContent = `${start} 至 ${end}`;
+            } else if (pickerFirst) {
+                label.textContent = `已选 ${pickerFirst}，再点一个日期生成时间段`;
+            } else {
+                label.textContent = '未选择日期';
+            }
+        }
+        function renderColorPicker() {
+            document.getElementById('schedule-color-picker').innerHTML = EVENT_COLORS.map(c =>
+                `<div class="color-swatch ${c.name === scheduleColorName ? 'selected' : ''}" style="background:${c.value}" title="${c.name}" onclick="setScheduleColor('${c.name}')"></div>`
+            ).join('');
+        }
+        function setScheduleColor(name) {
+            scheduleColorName = name;
+            renderColorPicker();
+        }
         function saveSchedule() {
+            const title = document.getElementById('schedule-title').value.trim();
+            if (!title) return showAlert('提示', '请输入事项');
+            let startDate, endDate;
+            if (pickerFirst && pickerSecond) {
+                startDate = pickerFirst < pickerSecond ? pickerFirst : pickerSecond;
+                endDate = pickerFirst < pickerSecond ? pickerSecond : pickerFirst;
+            } else if (pickerFirst) {
+                startDate = endDate = pickerFirst;
+            } else {
+                startDate = endDate = todayStr();
+            }
             const item = {
                 id: Date.now(),
-                date: document.getElementById('schedule-date').value,
+                startDate: startDate,
+                endDate: endDate,
                 time: document.getElementById('schedule-time').value,
-                title: document.getElementById('schedule-title').value,
+                title: title,
                 note: document.getElementById('schedule-note').value,
+                color: scheduleColorName,
                 done: false
             };
-            if (!item.title) return showAlert('提示', '请输入事项');
             data.schedules.push(item);
-            data.schedules.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+            data.schedules.sort((a, b) => ((a.startDate || a.date) + (a.time || '')).localeCompare((b.startDate || b.date) + (b.time || '')));
             saveData();
             closeScheduleModal();
+            selectedScheduleDate = startDate;
             renderSchedule();
+            renderScheduleCalendar();
+            renderScheduleDayDetail();
         }
         function toggleSchedule(id) {
             const item = data.schedules.find(s => s.id === id);
-            if (item) { item.done = !item.done; saveData(); renderSchedule(); }
+            if (item) { item.done = !item.done; saveData(); renderSchedule(); renderScheduleCalendar(); renderScheduleDayDetail(); }
         }
         function deleteSchedule(id) {
             showConfirm('删除日程', '确定删除？', function(ok) {
@@ -1525,6 +1798,8 @@
                 data.schedules = data.schedules.filter(s => s.id !== id);
                 saveData();
                 renderSchedule();
+                renderScheduleCalendar();
+                renderScheduleDayDetail();
             });
         }
         function renderSchedule() {
@@ -1535,25 +1810,32 @@
             }
             const groups = {};
             data.schedules.forEach(s => {
-                if (!groups[s.date]) groups[s.date] = [];
-                groups[s.date].push(s);
+                const start = s.startDate || s.date;
+                if (!groups[start]) groups[start] = [];
+                groups[start].push(s);
             });
             let html = '';
             Object.keys(groups).sort().forEach(date => {
-                const isToday = date === new Date().toISOString().split('T')[0];
+                const isToday = date === todayStr();
                 html += `<div class="card"><div class="card-title">${date} ${isToday ? '<span class="tag tag-blue">今天</span>' : ''}</div>`;
-                html += groups[date].map(s => `
+                html += groups[date].map(s => {
+                    const color = colorByName(s.color);
+                    const start = s.startDate || s.date;
+                    const end = s.endDate || start;
+                    const range = start !== end ? ` <span class="text-sm text-gray">(${start} ~ ${end})</span>` : '';
+                    return `
                     <div class="list-item">
                         <div class="list-item-info" style="display:flex;align-items:center;gap:10px">
                             <input type="checkbox" ${s.done ? 'checked' : ''} onchange="toggleSchedule(${s.id})">
                             <div style="${s.done ? 'text-decoration:line-through;color:#AAA' : ''}">
-                                <h4>${s.time || '全天'} · ${s.title}</h4>
+                                <h4><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:6px"></span>${s.time || '全天'} · ${s.title}${range}</h4>
                                 ${s.note ? `<p>${s.note}</p>` : ''}
                             </div>
                         </div>
                         <button class="btn btn-danger btn-sm" onclick="deleteSchedule(${s.id})">删除</button>
                     </div>
-                `).join('');
+                `;
+                }).join('');
                 html += '</div>';
             });
             container.innerHTML = html;
